@@ -32,9 +32,11 @@ entrega pierde el 20 %; quien no aparezca aquí no cuenta como parte del grupo.
 1. **Se trabaja sobre un fork de este repositorio.** El grupo hace el fork,
    lo deja público y trabaja ahí. Una entrega que no sea fork de este
    repositorio pierde el 30 % de la nota.
-2. **Cada integrante pega el enlace del fork en la tarea *Miniproyecto 1*
-   del campus.** Nada más: ni archivos, ni comprimidos, ni código por correo.
-   Quien no registre el enlace dentro del plazo tiene 0.0.
+2. **Un solo integrante pega el enlace del fork en la tarea *Miniproyecto 1*
+   del campus**, y esa entrega vale para todos los que aparecen en la tabla
+   de integrantes. Si un grupo entrega más de una vez, se califica la de
+   menor nota. Nada más: ni archivos, ni comprimidos, ni código por correo.
+   El grupo que no registre el enlace dentro del plazo tiene 0.0.
 3. **Se califica el último commit anterior a la hora de cierre.** Lo que se
    suba después no se tiene en cuenta.
 4. **El informe es `docs/informe.md`, en Markdown**, con las fórmulas en
