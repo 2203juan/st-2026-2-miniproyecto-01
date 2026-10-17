@@ -9,7 +9,20 @@ módulos 1 y 2: decisiones sobre los datos, descomposición, líneas base,
 rúbrica, está publicado en el campus. Este repositorio es el punto de partida
 del grupo.
 
+## El enfoque
+
+El miniproyecto es un experimento, no una competencia por el número más
+bajo. Se evalúa que el grupo use las herramientas del curso sobre su serie,
+tome decisiones y explique con sus cifras qué pasó y por qué. Un modelo que
+no gana, bien analizado, vale más que uno que gana sin explicación.
+
+La serie es propia y cumple unos mínimos: mensual, pública (con fuente y
+licencia), al menos 60 observaciones y estacionalidad visible. Su ficha va
+en `datos/README.md`.
+
 ## Integrantes
+
+Los grupos son de 3 integrantes.
 
 Esta tabla identifica al grupo. Sin ella, o con algún dato incompleto, la
 entrega pierde el 20 %; quien no aparezca aquí no cuenta como parte del grupo.
@@ -30,7 +43,9 @@ entrega pierde el 20 %; quien no aparezca aquí no cuenta como parte del grupo.
 ## Cómo se entrega
 
 1. **Se trabaja sobre un fork de este repositorio.** El grupo hace el fork,
-   lo deja público y trabaja ahí. Una entrega que no sea fork de este
+   lo deja público, agrega a los otros dos integrantes como colaboradores y
+   cada uno trabaja con su propia cuenta, en ramas. La página *Git y GitHub
+   en el curso* del campus explica cómo. Una entrega que no sea fork de este
    repositorio pierde el 30 % de la nota.
 2. **Un solo integrante pega el enlace del fork en la tarea *Miniproyecto 1*
    del campus**, y esa entrega vale para todos los que aparecen en la tabla
