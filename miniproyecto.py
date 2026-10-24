@@ -141,12 +141,71 @@ def descomponer(serie):
 # ============================================================
 
 def estacionariedad(serie):
-    """TODO: ADF sobre la serie, su diferencia regular, la estacional y las dos.
+    """ADF sobre la serie, su diferencia regular, la estacional y las dos.
 
-    Imprima el valor p de cada versión, elija d y D, y guarde la ACF y la
-    PACF de la serie elegida en figuras/acf_pacf.png. Devuelva (d, D).
+    Imprime el valor p de cada versión, elige d y D, y guarda la ACF y la
+    PACF de la serie elegida en figuras/acf_pacf.png. Devuelve (d, D).
     """
-    raise NotImplementedError("estacionariedad, ACF y PACF")
+    from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+    from statsmodels.tsa.stattools import acf, adfuller, pacf
+
+    # (nombre, d, D, versión). La original tiene tendencia visible, así que
+    # se prueba con constante y tendencia ("ct"); las diferenciadas ya no la
+    # tienen y se prueban solo con constante ("c").
+    versiones = [
+        ("original", 0, 0, serie),
+        ("diff(12)", 0, 1, serie.diff(PERIODO)),
+        ("diff()", 1, 0, serie.diff()),
+        ("diff(12).diff()", 1, 1, serie.diff(PERIODO).diff()),
+    ]
+    print("\nParte 3. Prueba ADF (H0: raíz unitaria)")
+    print(f"  {'versión':<16} {'d':>2} {'D':>2} {'regression':>10} {'valor p':>9}")
+    filas = []
+    for nombre, d, D, version in versiones:
+        regresion = "ct" if nombre == "original" else "c"
+        valor_p = adfuller(version.dropna(), regression=regresion)[1]
+        filas.append((nombre, d, D, valor_p))
+        print(f"  {nombre:<16} {d:>2} {D:>2} {regresion:>10} {valor_p:>9.4f}")
+
+    # Regla: la combinación con menos diferencias cuyo valor p queda bajo
+    # 0,05. Si empatan la regular y la estacional, se prefiere la estacional
+    # (por eso va antes en la lista): la estacionalidad es lo más marcado de
+    # la serie y solo diff(12) la quita.
+    estacionarias = [f for f in filas if f[3] < 0.05]
+    nombre, d, D, valor_p = min(estacionarias, key=lambda f: f[1] + f[2])
+    print(f"  elegida: {nombre} -> d = {d}, D = {D} (valor p {valor_p:.4f})")
+
+    elegida = serie
+    if D:
+        elegida = elegida.diff(PERIODO)
+    if d:
+        elegida = elegida.diff()
+    elegida = elegida.dropna()
+
+    rezagos = 36
+    figura, ejes = plt.subplots(2, 1, figsize=(9, 6))
+    plot_acf(elegida, lags=rezagos, ax=ejes[0], title=f"ACF de {nombre}")
+    plot_pacf(elegida, lags=rezagos, ax=ejes[1], method="ywm",
+              title=f"PACF de {nombre}")
+    figura.tight_layout()
+    figura.savefig(FIGURAS / "acf_pacf.png", dpi=120)
+    plt.close(figura)
+
+    # Rezagos fuera de las bandas del 95 %, las mismas que dibujan las gráficas.
+    valores_acf, bandas_acf = acf(elegida, nlags=rezagos, alpha=0.05)
+    valores_pacf, bandas_pacf = pacf(elegida, nlags=rezagos, alpha=0.05, method="ywm")
+
+    def fuera(bandas):
+        return [k for k in range(1, rezagos + 1)
+                if not bandas[k, 0] <= 0 <= bandas[k, 1]]
+
+    fuera_acf, fuera_pacf = fuera(bandas_acf), fuera(bandas_pacf)
+    print(f"  ACF, rezagos fuera de las bandas: {fuera_acf}")
+    print(f"  PACF, rezagos fuera de las bandas: {fuera_pacf}")
+    print("  rezago |  ACF  | PACF")
+    for k in sorted(set(fuera_acf) | set(fuera_pacf) | {12, 24, 36}):
+        print(f"  {k:>6} | {valores_acf[k]:+.2f} | {valores_pacf[k]:+.2f}")
+    return d, D
 
 
 # ============================================================
