@@ -33,22 +33,47 @@ RESULTADOS.mkdir(exist_ok=True)
 # Cambie estos cuatro datos por los de la serie del grupo y documente la
 # fuente en datos/README.md. La serie de ejemplo solo sirve para probar que
 # el guion corre.
-ARCHIVO = "datos/air_passengers.csv"
-FECHA = "Month"
-VALOR = "#Passengers"
+ARCHIVO = "datos/aep_mensual.csv"
+FECHA = "mes"
+VALOR = "AEP_MW"
 PERIODO = 12
 
 # Lo que se hizo con los huecos y con los datos atípicos, en una línea. Va
 # a la columna `decision` de la tabla de métricas.
-DECISION = "TODO: describa aquí la decisión sobre huecos y datos atípicos"
+DECISION = ("sin huecos (ago-2018 incompleto se descarta al agregar); "
+            "el atípico de jul-2009 se conserva porque es demanda real")
 
 
 def preparar(serie):
-    """TODO: aplique la decisión del grupo sobre huecos y datos atípicos.
+    """Decisión del grupo sobre huecos y datos atípicos.
 
-    Por ejemplo, interpolar los meses vacíos o recortar el tramo afectado.
-    Debe devolver una serie sin NaN.
+    Huecos: la serie mensual no tiene meses vacíos, porque el único mes
+    incompleto (agosto de 2018, 49 horas) se descarta en datos/preparar_aep.py.
+    Si apareciera algún NaN, se interpola linealmente para no romper el
+    backtest.
+
+    Atípicos: cada mes se compara con el promedio del mismo mes un año antes
+    y un año después. Se marca como atípico si la diferencia pasa de 3
+    desviaciones estándar. Los atípicos se conservan: son demanda real, no
+    errores de medición.
     """
+    vacios = serie.isna().sum()
+    if vacios:
+        print(f"  se interpolan {vacios} meses vacíos")
+    serie = serie.interpolate(method="linear").dropna()
+
+    print(f"  valor más alto: {serie.idxmax():%Y-%m}, {serie.max():,.0f} MW")
+    print(f"  valor más bajo: {serie.idxmin():%Y-%m}, {serie.min():,.0f} MW")
+
+    vecinos = (serie.shift(PERIODO) + serie.shift(-PERIODO)) / 2
+    diferencia = (serie - vecinos).dropna()
+    z = diferencia / diferencia.std()
+    print(f"  diferencia con el mismo mes de los años vecinos: {len(diferencia)} meses, "
+          f"desviación estándar {diferencia.std():,.0f} MW")
+    for mes in z.abs().nlargest(4).index:
+        marca = "  <- atípico (|z| > 3)" if abs(z[mes]) > 3 else ""
+        print(f"    {mes:%Y-%m}: {serie[mes]:,.0f} MW frente a {vecinos[mes]:,.0f} MW, "
+              f"{diferencia[mes]:+,.0f} MW ({z[mes]:+.1f} desv.){marca}")
     return serie
 
 
