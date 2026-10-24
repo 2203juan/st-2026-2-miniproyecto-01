@@ -92,8 +92,48 @@ def graficar_serie(serie):
 # ============================================================
 
 def descomponer(serie):
-    """TODO: STL robusta con el periodo de la serie; guarde figuras/stl.png."""
-    raise NotImplementedError("descomposición STL")
+    """STL robusta con el periodo de la serie; guarda figuras/stl.png."""
+    from statsmodels.tsa.seasonal import STL
+
+    # period=12: la serie es mensual y el ciclo se repite cada año.
+    # robust=True: los meses atípicos pesan menos y su efecto queda en el residuo.
+    stl = STL(serie, period=PERIODO, robust=True).fit()
+    figura = stl.plot()
+    figura.set_size_inches(9, 7)
+    figura.tight_layout()
+    figura.savefig(FIGURAS / "stl.png", dpi=120)
+    plt.close(figura)
+
+    print("\nParte 2. Descomposición STL (period=12, robust=True)")
+    tendencia = stl.trend
+    pico = tendencia[:"2008"].idxmax()
+    valle = tendencia["2008-06":"2010"].idxmin()
+    repunte = tendencia["2010":"2012"].idxmax()
+    minimo = tendencia.idxmin()
+    print(f"  tendencia al inicio ({tendencia.index[0]:%Y-%m}): {tendencia.iloc[0]:,.0f} MW")
+    print(f"  máximo de la tendencia: {pico:%Y-%m}, {tendencia[pico]:,.0f} MW")
+    print(f"  valle tras la caída: {valle:%Y-%m}, {tendencia[valle]:,.0f} MW")
+    print(f"  repunte: {repunte:%Y-%m}, {tendencia[repunte]:,.0f} MW")
+    print(f"  mínimo de la tendencia: {minimo:%Y-%m}, {tendencia[minimo]:,.0f} MW")
+    print(f"  tendencia al final ({tendencia.index[-1]:%Y-%m}): {tendencia.iloc[-1]:,.0f} MW")
+
+    estacional_mes = stl.seasonal.groupby(stl.seasonal.index.month).mean()
+    print("  estacional promedio por mes, de mayor a menor (MW):")
+    for mes, valor in estacional_mes.sort_values(ascending=False).items():
+        print(f"    {mes:>2}: {valor:+,.0f}")
+    print(f"  amplitud (mes más alto − más bajo): "
+          f"{estacional_mes.max() - estacional_mes.min():,.0f} MW")
+
+    residuo = stl.resid
+    print(f"  desviación estándar del residuo: {residuo.std():,.0f} MW; "
+          f"meses con |residuo| < 500 MW: {(residuo.abs() < 500).mean():.0%}")
+    print("  cinco residuos más grandes en valor absoluto:")
+    for mes in residuo.abs().nlargest(5).index:
+        esperado = tendencia[mes] + stl.seasonal[mes]
+        print(f"    {mes:%Y-%m}: real {serie[mes]:,.0f} | tendencia + estacional "
+              f"{esperado:,.0f} | residuo {residuo[mes]:+,.0f} MW "
+              f"({residuo[mes] / residuo.std():+.1f} desv.)")
+    return stl
 
 
 # ============================================================

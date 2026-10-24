@@ -66,16 +66,93 @@ conserva porque es demanda real*.
 
 ![STL](../figuras/stl.png)
 
-{{Lectura de la descomposición STL: cómo es la tendencia, qué meses quedan
-arriba y abajo en la estacional y con cuánto, y dónde está el residuo más
-grande.}}
+La STL descompone la serie en forma aditiva,
+
+$$y_t = T_t + S_t + R_t,$$
+
+con tendencia $T_t$, estacionalidad $S_t$ y residuo $R_t$. Usamos
+`period=12` porque la serie es mensual y el ciclo se repite cada año, y
+`robust=True` para que los atípicos no deformen $T_t$ ni $S_t$.
+
+### Tendencia
+
+- Empieza en 15 357 MW en octubre de 2004 y sube hasta un máximo de 16 654 MW
+  en noviembre de 2007.
+- Cae hasta 15 500 MW en octubre de 2009, en los años de la recesión de
+  2008-2009, y repunta a 15 887 MW en enero de 2011.
+- Después baja de forma sostenida hasta su mínimo, 14 598 MW en enero de 2017.
+- La subida final hasta 15 393 MW está en el borde de la serie, donde la STL
+  es menos confiable.
+
+En total, la tendencia se mueve unos 2 000 MW en catorce años, menos que la
+amplitud estacional.
+
+### Estacionalidad
+
+Hay dos picos al año. El de invierno es el mayor: enero
+queda 1 726 MW por encima de la tendencia (el mes más alto), seguido de
+febrero (+1 102 MW) y diciembre (+1 042 MW). El de verano lo marca julio
+(+1 086 MW), seguido de agosto (+661 MW). Los meses más bajos son los
+templados: abril (−1 689 MW, el más bajo), octubre (−1 569 MW) y mayo
+(−1 522 MW). Entre enero y abril hay 3 415 MW de diferencia.
+
+### Residuo
+
+La desviación estándar del residuo es 572 MW, y el 83 % de los
+meses tiene un residuo menor de 500 MW en valor absoluto. El más grande es
+febrero de 2015: la carga real fue 18 407 MW y la tendencia más la
+estacionalidad daban 16 121 MW, un residuo de +2 286 MW. El siguiente es
+julio de 2009, con 14 697 MW frente a 16 814 MW esperados (−2 116 MW). Les
+siguen enero de 2005 (+1 881 MW), agosto de 2016 (+1 782 MW) y diciembre de
+2015 (−1 623 MW).
+
+Julio de 2009 es el mismo mes que la sección 1 marcó como atípico. Febrero de
+2015, en cambio, no pasaba el umbral de la sección 1 porque febrero de 2014
+también fue un mes de carga alta, pero frente a la tendencia y la
+estacionalidad es el mes más extremo de la serie. Coincide con un frío
+récord en la región: en el norte de Ohio, dentro del territorio de AEP, fue
+el febrero más frío del que hay registro en casi todas las estaciones, con
+temperaturas medias hasta 15 °F por debajo de lo normal
+([NWS Cleveland, revisión del invierno 2014-15](https://www.weather.gov/cle/Climate_Winter_2014-15_Review)).
+Con `robust=True`, estos dos meses pesan menos al estimar la tendencia y la
+estacionalidad, y su efecto queda en el residuo.
 
 ## 3. Líneas base y backtest
 
-{{Cómo es el backtest: cuántos orígenes, horizonte y qué meses quedan en la
-prueba. Por qué ningún dato posterior al origen entra al modelo.}}
+El *backtest* es el común de `comun.py`, con origen móvil sobre los últimos 24
+meses y horizonte de 1 a 12. Desde cada origen $T$, el modelo pronostica
+$\hat y_{T+1}, \dots, \hat y_{T+12}$ y se compara con los 12 valores reales.
+Con 166 meses hay $24 - 12 + 1 = 13$ orígenes, de julio de 2016 a julio de
+2017. Los meses de prueba van de agosto de 2016 a julio de 2018, y el primer
+origen todavía deja 142 meses para ajustar. No caben 24 orígenes porque cada
+uno necesita 12 meses reales después de él. Ningún dato posterior al
+origen entra al modelo: `backtest` le pasa a `modelo(entrenamiento, h)`
+solo `serie.iloc[:corte]`, y los valores reales posteriores solo se usan para
+calcular el error.
 
-{{RMSE, MAE y MAPE del ingenuo y del estacional ingenuo, y cuál gana.}}
+Las métricas de cada origen se promedian sobre los 13 orígenes:
+
+$$\text{RMSE} = \sqrt{\frac{1}{12}\sum_{h=1}^{12}(y_{T+h}-\hat y_{T+h})^2},\qquad
+\text{MAE} = \frac{1}{12}\sum_{h=1}^{12}\lvert y_{T+h}-\hat y_{T+h}\rvert,\qquad
+\text{MAPE} = \frac{100}{12}\sum_{h=1}^{12}\left\lvert\frac{y_{T+h}-\hat y_{T+h}}{y_{T+h}}\right\rvert.$$
+
+Las dos líneas base son el ingenuo, $\hat y_{T+h} = y_T$, y el estacional
+ingenuo, $\hat y_{T+h} = y_{T+h-12}$ para $h \le 12$.
+
+| Modelo | RMSE | MAE | MAPE (%) |
+|---|---|---|---|
+| Estacional ingenuo | 935,52 | 763,24 | 5,09 |
+| Ingenuo | 1 641,37 | 1 385,72 | 9,52 |
+
+El estacional ingenuo gana en las tres métricas: reduce el RMSE en un
+43 %, el MAE en un 45 % y el MAPE en un 47 % frente al ingenuo. La razón está en
+la sección 2: con 3 415 MW de diferencia entre enero y abril,
+repetir el último valor durante 12 meses falla cada vez que el horizonte
+cruza un pico o un valle. Copiar el mismo mes del año anterior, en cambio,
+recoge los dos picos anuales. Su MAE dice que se equivoca en promedio en
+763 MW de carga media por hora, y su MAPE que ese error es cerca del 5 % de
+la carga real. Con un RMSE de 935,52, es la referencia para comparar los
+modelos de la sección 5.
 
 ## 4. Estacionariedad e identificación
 
