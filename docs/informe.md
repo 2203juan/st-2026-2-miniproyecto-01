@@ -156,12 +156,68 @@ modelos de la sección 5.
 
 ## 4. Estacionariedad e identificación
 
-{{Valor p de la prueba ADF para la serie, su diferencia regular, la
-estacional y las dos juntas. El d y el D elegidos.}}
+La prueba ADF estima
+
+$$\Delta y_t = \alpha + \beta t + \gamma\, y_{t-1} + \sum_{j=1}^{k}\delta_j\,\Delta y_{t-j} + \varepsilon_t$$
+
+con hipótesis nula $H_0: \gamma = 0$ (raíz unitaria, serie no estacionaria).
+Un valor p menor que 0,05 rechaza $H_0$. La serie original tiene una
+tendencia visible, así que se prueba con constante y tendencia
+(`regression="ct"`, con el término $\beta t$). Las versiones diferenciadas ya
+no la tienen y se prueban solo con constante (`regression="c"`, $\beta = 0$).
+
+| Versión | d | D | `regression` | Valor p |
+|---|---|---|---|---|
+| Original | 0 | 0 | `ct` | 0,0858 |
+| `diff(12)` | 0 | 1 | `c` | 0,0016 |
+| `diff()` | 1 | 0 | `c` | 0,0012 |
+| `diff(12).diff()` | 1 | 1 | `c` | 0,0003 |
+
+La serie original no rechaza $H_0$ (0,0858 > 0,05). Las tres versiones
+diferenciadas sí. La regla es elegir la combinación con menos diferencias
+cuyo valor p quede bajo 0,05, y aquí empatan `diff()` y `diff(12)`, cada una
+con una sola diferencia. Elegimos $d = 0$ y $D = 1$, es decir,
+$w_t = (1 - B^{12})\,y_t = y_t - y_{t-12}$. Preferimos la diferencia
+estacional porque la estacionalidad es el rasgo más marcado de la serie y
+solo `diff(12)` la quita. Como la tendencia cambia despacio, esa misma
+diferencia también elimina buena parte de ella. Agregar la diferencia regular
+($d = D = 1$) bajaría el valor p, pero con el riesgo de sobrediferenciar.
 
 ![ACF y PACF](../figuras/acf_pacf.png)
 
-{{Qué rezagos salen de las bandas y qué órdenes sugieren.}}
+En la ACF de $w_t$ salen de las bandas del 95 % los rezagos 1, 2, 3, 4 y
+12. En la PACF salen los rezagos 1, 3, 12, 21 y 24.
+
+| Rezago | ACF | PACF |
+|---|---|---|
+| 1 | +0,44 | +0,44 |
+| 2 | +0,26 | +0,09 |
+| 3 | +0,36 | +0,27 |
+| 4 | +0,24 | −0,01 |
+| 12 | −0,27 | −0,32 |
+| 21 | −0,15 | −0,20 |
+| 24 | −0,23 | −0,20 |
+| 36 | +0,01 | −0,13 |
+
+### Parte no estacional
+
+La ACF es positiva y decae lentamente en los
+primeros cuatro rezagos. La PACF, en cambio, tiene picos en los rezagos 1 y 3
+y queda dentro de las bandas en el 2 y el 4. Ese patrón sugiere un término
+autorregresivo de orden bajo, $p$ entre 1 y 3, con $q$ de 0 a 2 para
+recoger lo que quede.
+
+### Parte estacional
+
+Después de `diff(12)`, la ACF tiene un pico negativo en
+el rezago 12 (−0,27) y luego se apaga (+0,01 en el 36). La PACF es negativa
+y decae en los rezagos estacionales (−0,32 en el 12, −0,20 en el 24 y −0,13
+en el 36). Un pico aislado en el rezago 12 de la ACF, con una PACF que decae
+en 12, 24 y 36, corresponde a un MA estacional de orden 1, frecuente después
+de aplicar la diferencia estacional. Por eso proponemos $Q = 1$ y $P = 0$, sin
+otra diferencia. La
+rejilla de la sección 5 prueba estos órdenes alrededor de
+$(p, 0, q)(0, 1, 1)_{12}$.
 
 ## 5. Modelos clásicos
 
