@@ -29,7 +29,7 @@ entrega pierde el 20 %; quien no aparezca aquí no cuenta como parte del grupo.
 
 | Nombre completo | Código | Correo institucional |
 |---|---|---|
-| | | |
+| Juan José Hoyos | PENDIENTE | PENDIENTE |
 | | | |
 | | | |
 
@@ -92,3 +92,4 @@ python miniproyecto.py
 En la sustentación, un integrante elegido en el momento corre el guion. La
 acción de GitHub del repositorio lo corre en cada *push*: si queda en rojo,
 el guion no corre de principio a fin.
+

@@ -1,0 +1,3 @@
+modelo,decision,RMSE,MAE,MAPE
+estacional ingenuo,sin huecos (ago-2018 incompleto se descarta al agregar); el atípico de jul-2009 se conserva porque es demanda real,935.52,763.24,5.09
+ingenuo,sin huecos (ago-2018 incompleto se descarta al agregar); el atípico de jul-2009 se conserva porque es demanda real,1641.37,1385.72,9.52
