@@ -284,8 +284,16 @@ def elegir_sarima(serie, d, D):
 
 
 def modelo_sarima(orden, orden_estacional):
-    """TODO: devuelva la función modelo(entrenamiento, h) del SARIMA elegido."""
-    raise NotImplementedError("SARIMA en el backtest")
+    """Devuelve la función modelo(entrenamiento, h) del SARIMA elegido."""
+    from statsmodels.tsa.arima.model import ARIMA
+
+    def modelo(entrenamiento, h):
+        # Se reajusta en cada origen solo con `entrenamiento`: no hay fuga.
+        ajuste = ARIMA(entrenamiento / ESCALA, order=orden,
+                       seasonal_order=orden_estacional).fit()
+        return ajuste.forecast(h).to_numpy() * ESCALA
+
+    return modelo
 
 
 def exogenas(serie):
