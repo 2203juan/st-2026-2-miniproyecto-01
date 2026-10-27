@@ -296,6 +296,25 @@ def modelo_sarima(orden, orden_estacional):
     return modelo
 
 
+def contrastar_estacional(serie, orden, orden_estacional):
+    """Experimento: el mismo SARIMA con P cambiado (1 -> 0 o 0 -> 1).
+
+    La rejilla elige por AIC, que mide el ajuste dentro de la muestra. Este
+    contraste mide el modelo vecino en el mismo backtest. No entra a la tabla:
+    elegir el modelo por su backtest sería usar los datos de prueba para
+    seleccionarlo.
+    """
+    from statsmodels.tsa.arima.model import ARIMA
+
+    P, D, Q, s = orden_estacional
+    vecino = (1 - P, D, Q, s)
+    aic = ARIMA(serie / ESCALA, order=orden, seasonal_order=vecino).fit().aic
+    _, promedio = backtest(serie, modelo_sarima(orden, vecino))
+    print(f"  contraste (no entra a la tabla): SARIMA{orden}{vecino}, AIC {aic:.2f} | "
+          f"backtest RMSE {promedio['RMSE']:.2f}, MAE {promedio['MAE']:.2f}, "
+          f"MAPE {promedio['MAPE']:.2f}")
+
+
 def exogenas(serie):
     """TODO: DataFrame de variables conocidas de antemano, con el índice de la serie.
 
@@ -356,6 +375,7 @@ def main():
             orden, estacional = elegir_sarima(serie, d, D)
             filas.append(fila(f"SARIMA{orden}{estacional}", serie,
                               modelo_sarima(orden, estacional)))
+            contrastar_estacional(serie, orden, estacional)
             x = exogenas(serie)
             filas.append(fila(f"SARIMAX{orden}{estacional} + exógenas", serie,
                               modelo_sarimax(orden, estacional, x)))
