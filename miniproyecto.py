@@ -214,14 +214,45 @@ def estacionariedad(serie):
 # Cada modelo es una función modelo(entrenamiento, h) que devuelve h
 # pronósticos y solo usa `entrenamiento`. Así entra al backtest común.
 
-def elegir_sarima(serie, d, D):
-    """TODO: rejilla pequeña de órdenes (p, q, P, Q) comparada por AIC.
+# Los modelos se ajustan sobre serie / ESCALA, en GW (valores entre 12,8 y
+# 19,2), y sus pronósticos se multiplican por ESCALA para volver a MW. Con
+# la serie en MW, sigma2 queda en cientos de miles y el optimizador se pierde.
+ESCALA = 1000
 
-    Ajuste con toda la serie preparada, imprima la tabla de AIC, revise los
-    residuos del elegido con Ljung-Box y guarde figuras/residuos.png.
-    Devuelva el orden y el orden estacional elegidos.
+# Rejilla: p de 0 a 3 y q de 0 a 2 (la PACF de diff(12) sale en los rezagos
+# 1 y 3), P y Q en 0 o 1 (el pico del rezago 12). d y D quedan fijos: cambian
+# la serie que se modela y el AIC de series distintas no se compara.
+REJILLA_P, REJILLA_Q, REJILLA_ESTACIONAL = range(4), range(3), range(2)
+
+
+def elegir_sarima(serie, d, D):
+    """Rejilla pequeña de órdenes (p, q, P, Q) comparada por AIC.
+
+    Ajusta con toda la serie preparada, imprime la tabla de AIC, revisa los
+    residuos del elegido con Ljung-Box y guarda figuras/residuos.png.
+    Devuelve el orden y el orden estacional elegidos.
     """
-    raise NotImplementedError("selección del SARIMA")
+    import itertools
+
+    from statsmodels.tsa.arima.model import ARIMA
+
+    escalada = serie / ESCALA
+    filas = []
+    for p, q, P, Q in itertools.product(REJILLA_P, REJILLA_Q,
+                                        REJILLA_ESTACIONAL, REJILLA_ESTACIONAL):
+        ajuste = ARIMA(escalada, order=(p, d, q),
+                       seasonal_order=(P, D, Q, PERIODO)).fit()
+        filas.append({"order": (p, d, q), "seasonal_order": (P, D, Q, PERIODO),
+                      "AIC": ajuste.aic})
+    rejilla = pd.DataFrame(filas).sort_values("AIC").reset_index(drop=True)
+
+    print(f"\nParte 4. Rejilla SARIMA: {len(rejilla)} modelos con d = {d} y D = {D}, "
+          f"ordenados por AIC (los 10 primeros)")
+    print(rejilla.head(10).to_string(formatters={"AIC": "{:.2f}".format}))
+    orden = rejilla.loc[0, "order"]
+    orden_estacional = rejilla.loc[0, "seasonal_order"]
+    print(f"  elegido: SARIMA{orden}{orden_estacional}, AIC {rejilla.loc[0, 'AIC']:.2f}")
+    return orden, orden_estacional
 
 
 def modelo_sarima(orden, orden_estacional):
