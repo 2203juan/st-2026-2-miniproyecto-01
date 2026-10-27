@@ -234,6 +234,8 @@ def elegir_sarima(serie, d, D):
     """
     import itertools
 
+    from statsmodels.graphics.tsaplots import plot_acf
+    from statsmodels.stats.diagnostic import acorr_ljungbox
     from statsmodels.tsa.arima.model import ARIMA
 
     escalada = serie / ESCALA
@@ -252,6 +254,32 @@ def elegir_sarima(serie, d, D):
     orden = rejilla.loc[0, "order"]
     orden_estacional = rejilla.loc[0, "seasonal_order"]
     print(f"  elegido: SARIMA{orden}{orden_estacional}, AIC {rejilla.loc[0, 'AIC']:.2f}")
+
+    mejor = ARIMA(escalada, order=orden, seasonal_order=orden_estacional).fit()
+    print("  coeficientes del elegido (serie en GW):")
+    for nombre, valor in mejor.params.items():
+        print(f"    {nombre:<10} {valor:+.3f}  (valor p {mejor.pvalues[nombre]:.3f})")
+
+    # Los primeros d + 12·D residuos salen de la inicialización de las
+    # diferencias, no son errores de pronóstico: se dejan por fuera.
+    residuos = mejor.resid.iloc[d + PERIODO * D:] * ESCALA
+    prueba = acorr_ljungbox(residuos, lags=[12, 24])
+    print(f"  Ljung-Box sobre {len(residuos)} residuos (H0: son ruido blanco):")
+    for rezago, fila_lb in prueba.iterrows():
+        print(f"    lags={rezago}: Q = {fila_lb['lb_stat']:.2f}, "
+              f"valor p {fila_lb['lb_pvalue']:.3f}")
+    print(f"  residuos: media {residuos.mean():+,.0f} MW, "
+          f"desviación estándar {residuos.std():,.0f} MW")
+
+    figura, ejes = plt.subplots(2, 1, figsize=(9, 6))
+    ejes[0].plot(residuos.index, residuos.to_numpy())
+    ejes[0].axhline(0, color="gray", linewidth=0.8)
+    ejes[0].set_title(f"Residuos de SARIMA{orden}{orden_estacional}")
+    ejes[0].set_ylabel("MW")
+    plot_acf(residuos, lags=36, ax=ejes[1], title="ACF de los residuos")
+    figura.tight_layout()
+    figura.savefig(FIGURAS / "residuos.png", dpi=120)
+    plt.close(figura)
     return orden, orden_estacional
 
 
