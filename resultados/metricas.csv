@@ -1,4 +1,5 @@
 modelo,decision,RMSE,MAE,MAPE
-"SARIMA(3, 0, 0)(1, 1, 1, 12)",sin huecos (ago-2018 incompleto se descarta al agregar); el atípico de jul-2009 se conserva porque es demanda real,770.99,606.26,4.12
+"SARIMA(3, 0, 0)(1, 1, 1, 12)",sin huecos (ago-2018 incompleto se descarta al agregar); el atípico de jul-2009 se conserva porque es demanda real,770.97,606.25,4.12
+"SARIMAX(3, 0, 0)(1, 1, 1, 12) + exógenas",sin huecos (ago-2018 incompleto se descarta al agregar); el atípico de jul-2009 se conserva porque es demanda real,787.37,622.35,4.23
 estacional ingenuo,sin huecos (ago-2018 incompleto se descarta al agregar); el atípico de jul-2009 se conserva porque es demanda real,935.52,763.24,5.09
 ingenuo,sin huecos (ago-2018 incompleto se descarta al agregar); el atípico de jul-2009 se conserva porque es demanda real,1641.37,1385.72,9.52
