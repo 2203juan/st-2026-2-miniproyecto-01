@@ -315,22 +315,64 @@ def contrastar_estacional(serie, orden, orden_estacional):
           f"MAPE {promedio['MAPE']:.2f}")
 
 
-def exogenas(serie):
-    """TODO: DataFrame de variables conocidas de antemano, con el índice de la serie.
+# AEP atiende estados del oriente de Estados Unidos: los festivos son los
+# federales de ese país. El calendario se conoce con años de anticipación.
+PAIS = "US"
 
-    Por ejemplo, el número de festivos o de días hábiles de cada mes. Debe
-    cubrir también los 12 meses que siguen al final de la serie.
+
+def exogenas(serie):
+    """DataFrame de variables conocidas de antemano, con el índice de la serie.
+
+    Número de festivos de cada mes según el paquete holidays. Cubre también
+    los 12 meses que siguen al final de la serie, para pronosticar.
     """
-    raise NotImplementedError("variables exógenas")
+    import holidays
+
+    indice = pd.date_range(serie.index[0], periods=len(serie) + 12, freq="MS")
+    calendario = holidays.country_holidays(
+        PAIS, years=range(indice[0].year, indice[-1].year + 1))
+    fechas = pd.to_datetime(list(calendario.keys()))
+    festivos = pd.Series(1, index=fechas).resample("MS").sum()
+    x = festivos.reindex(indice, fill_value=0).astype(float).to_frame("festivos")
+
+    promedio = x["festivos"].groupby(x.index.month).mean()
+    print("\n  festivos por mes del año (promedio): "
+          + ", ".join(f"{mes}: {valor:.2f}" for mes, valor in promedio.items()))
+    print(f"  la exógena va de {x.index[0]:%Y-%m} a {x.index[-1]:%Y-%m}, "
+          f"12 meses más que la serie")
+    return x
 
 
 def modelo_sarimax(orden, orden_estacional, x):
-    """TODO: devuelva modelo(entrenamiento, h) de un SARIMAX con exógenas x.
+    """Devuelve modelo(entrenamiento, h) de un SARIMAX con exógenas x.
 
-    Use x.loc[entrenamiento.index] para ajustar y
-    x.loc[fechas_siguientes(entrenamiento, h)] para pronosticar.
+    Ajusta con x.loc[entrenamiento.index] y pronostica con
+    x.loc[fechas_siguientes(entrenamiento, h)]: los festivos futuros salen del
+    calendario, no de la serie, así que no hay fuga de información.
     """
-    raise NotImplementedError("SARIMAX en el backtest")
+    from statsmodels.tsa.arima.model import ARIMA
+
+    def modelo(entrenamiento, h):
+        ajuste = ARIMA(entrenamiento / ESCALA, exog=x.loc[entrenamiento.index],
+                       order=orden, seasonal_order=orden_estacional).fit()
+        futuro = x.loc[fechas_siguientes(entrenamiento, h)]
+        return ajuste.forecast(h, exog=futuro).to_numpy() * ESCALA
+
+    return modelo
+
+
+def resumen_sarimax(serie, orden, orden_estacional, x):
+    """Ajusta el SARIMAX con toda la serie e imprime el coeficiente de cada exógena."""
+    from statsmodels.tsa.arima.model import ARIMA
+
+    ajuste = ARIMA(serie / ESCALA, exog=x.loc[serie.index], order=orden,
+                   seasonal_order=orden_estacional).fit()
+    print(f"  SARIMAX{orden}{orden_estacional} + exógenas, con toda la serie: "
+          f"AIC {ajuste.aic:.2f}")
+    for nombre in x.columns:
+        beta = ajuste.params[nombre]
+        print(f"    {nombre}: beta = {beta:+.4f} GW = {beta * ESCALA:+,.0f} MW "
+              f"por unidad, valor p {ajuste.pvalues[nombre]:.3f}")
 
 
 # ============================================================
@@ -377,6 +419,7 @@ def main():
                               modelo_sarima(orden, estacional)))
             contrastar_estacional(serie, orden, estacional)
             x = exogenas(serie)
+            resumen_sarimax(serie, orden, estacional, x)
             filas.append(fila(f"SARIMAX{orden}{estacional} + exógenas", serie,
                               modelo_sarimax(orden, estacional, x)))
         except NotImplementedError as error:

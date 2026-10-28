@@ -326,8 +326,33 @@ medida honesta de cómo pronostica. El contraste sí dice algo útil: el
 término AR estacional ($\Phi_1 = 0{,}269$) mejora el ajuste pero no los
 pronósticos en estos dos años.
 
-{{La variable exógena: qué es, por qué se conoce de antemano y si mejora al
-SARIMA.}}
+### La variable exógena
+
+La exógena $x_t$ es el número de festivos federales de Estados Unidos en el
+mes $t$, del paquete `holidays` (AEP atiende estados del oriente de ese
+país). Incluye los días trasladados ("observed"), como el lunes 2 de enero de
+2017, cuando el 1 cayó en domingo. En promedio hay 2,33 festivos en
+noviembre, 2,20 en enero y 1,47 en diciembre, y ninguno en marzo, abril,
+junio y agosto. El SARIMAX la agrega al modelo elegido:
+
+$$y_t = \beta\, x_t + \eta_t, \qquad \eta_t \sim \text{SARIMA}(3, 0, 0)(1, 1, 1)_{12}.$$
+
+Se conoce de antemano porque el calendario de festivos se fija con años de
+anticipación. Por eso no hay fuga en el *backtest*: en cada origen el modelo
+se ajusta con `x.loc[entrenamiento.index]` y pronostica con
+`x.loc[fechas_siguientes(entrenamiento, h)]`, los festivos de los 12 meses
+siguientes, que salen del calendario y no de la serie. Si usáramos una
+variable que solo se conoce al terminar el mes, como la temperatura, habría
+que pronosticarla también; tomar su valor real sería usar información
+posterior al origen.
+
+Con toda la serie, $\beta = +0{,}105$ GW, unos 105 MW más de carga media por
+cada festivo adicional, con valor p 0,397: no se distingue de cero. El AIC
+pasa de 335,85 a 337,36, así que el parámetro extra no compensa. Los
+festivos se concentran en enero, noviembre y diciembre, meses de carga alta
+que la parte estacional del SARIMA ya recoge, y un festivo cambia poco el
+promedio de un mes de 30 días. En el *backtest* tampoco ayuda: el SARIMAX
+tiene un MAE de 622,35 MW frente a 606,25 del SARIMA (sección 6).
 
 ## 6. Tabla de métricas
 
