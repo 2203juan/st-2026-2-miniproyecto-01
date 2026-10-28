@@ -221,13 +221,110 @@ $(p, 0, q)(0, 1, 1)_{12}$.
 
 ## 5. Modelos clásicos
 
-{{La rejilla de órdenes y su AIC. El modelo elegido, escrito con su
-ecuación.}}
+### Rejilla por AIC
+
+Con $d = 0$ y $D = 1$ fijos, la rejilla prueba $p$ de 0 a 3 y $q$ de 0 a 2,
+por los picos de la PACF en los rezagos 1 y 3, y $P$ y $Q$ en 0 o 1, por el
+pico del rezago 12. Son 48 modelos, ajustados sobre la serie en GW
+(`ESCALA = 1000`): en MW la varianza del error queda en cientos de miles y,
+como vimos en el taller 2, el optimizador termina en una solución peor. $d$ y $D$ no entran a la rejilla:
+cambian la serie que se modela, y el AIC de series distintas no se compara.
+
+$$\text{AIC} = -2\ln L + 2k,$$
+
+con $L$ la verosimilitud y $k$ el número de parámetros. Los diez de menor AIC:
+
+| | `order` | `seasonal_order` | AIC |
+|---|---|---|---|
+| 1 | (3, 0, 0) | (1, 1, 1, 12) | 335,85 |
+| 2 | (3, 0, 1) | (1, 1, 1, 12) | 337,43 |
+| 3 | (1, 0, 1) | (1, 1, 1, 12) | 337,68 |
+| 4 | (1, 0, 2) | (1, 1, 1, 12) | 338,52 |
+| 5 | (3, 0, 2) | (1, 1, 1, 12) | 338,86 |
+| 6 | (2, 0, 1) | (1, 1, 1, 12) | 338,92 |
+| 7 | (2, 0, 2) | (1, 1, 1, 12) | 339,85 |
+| 8 | (3, 0, 0) | (0, 1, 1, 12) | 339,89 |
+| 9 | (1, 0, 1) | (0, 1, 1, 12) | 341,15 |
+| 10 | (1, 0, 2) | (0, 1, 1, 12) | 341,17 |
+
+Gana $\text{SARIMA}(3, 0, 0)(1, 1, 1)_{12}$. Los siete primeros tienen
+$P = Q = 1$: en la sección 4 propusimos $P = 0$, pero el término AR
+estacional baja el AIC en unos 4 puntos (339,89 con $P = 0$ frente a 335,85).
+Las diferencias entre los cinco primeros son menores de 3 puntos, así que
+varios modelos ajustan casi igual; el AR(3) es además el que corresponde a
+los picos de la PACF en los rezagos 1 y 3.
+
+### El modelo elegido
+
+Con $B$ el operador de rezago ($B^k y_t = y_{t-k}$), el modelo es
+
+$$(1 - \phi_1 B - \phi_2 B^2 - \phi_3 B^3)(1 - \Phi_1 B^{12})(1 - B^{12})\,y_t = (1 + \Theta_1 B^{12})\,\varepsilon_t,$$
+
+y con los coeficientes estimados (serie en GW):
+
+| Coeficiente | Valor | Valor p |
+|---|---|---|
+| $\phi_1$ (`ar.L1`) | +0,405 | 0,000 |
+| $\phi_2$ (`ar.L2`) | +0,058 | 0,532 |
+| $\phi_3$ (`ar.L3`) | +0,268 | 0,003 |
+| $\Phi_1$ (`ar.S.L12`) | +0,269 | 0,013 |
+| $\Theta_1$ (`ma.S.L12`) | −0,969 | 0,015 |
+| $\sigma^2$ | 0,417 GW² | |
+
+$\phi_1$ y $\phi_3$ son significativos y $\phi_2$ no, lo mismo que mostró la
+PACF: barras en los rezagos 1 y 3 y nada en el 2. $\Theta_1 = -0{,}969$ está
+cerca de $-1$: la sorpresa de un mes se descuenta casi entera al pronosticar
+el mismo mes del año siguiente, que es el pico negativo de $-0{,}27$ que tenía
+la ACF en el rezago 12.
 
 ![Residuos](../figuras/residuos.png)
 
-{{Diagnóstico de los residuos: Ljung-Box y lo que muestran la gráfica y su
-ACF.}}
+### Diagnóstico de los residuos
+
+Se dejan por fuera los 12 primeros residuos, que salen de la diferencia
+estacional y no son errores de pronóstico; quedan 154. La prueba de
+Ljung-Box junta sus autocorrelaciones $r_k$ hasta el rezago $m$,
+
+$$Q = n(n+2)\sum_{k=1}^{m}\frac{r_k^2}{n-k},$$
+
+con hipótesis nula de que los residuos son ruido blanco.
+
+| `lags` | $Q$ | Valor p |
+|---|---|---|
+| 12 | 8,56 | 0,740 |
+| 24 | 14,38 | 0,938 |
+
+Los dos valores p pasan de 0,05, así que no rechazamos la nula: no queda
+estructura en el primer año ni en el segundo. En la ACF de los residuos
+ninguna barra sale de las bandas del 95 %; la más grande es la del rezago
+25 ($-0{,}17$), justo en el borde. La media es $-65$ MW y la desviación
+estándar 691 MW, y el 86 % de los residuos queda por debajo de 1 000 MW en
+valor absoluto. Los más grandes son febrero de 2007 (+1 966 MW, el valor más
+alto de la serie), enero de 2014 (+1 515 MW) y julio de 2009 (−1 513 MW), el
+atípico que conservamos en la sección 1.
+
+### Contraste: el mismo modelo con $P = 0$
+
+En la sección 4 propusimos $P = 0$ y la rejilla eligió $P = 1$. Para ver
+qué se gana con ese término, el guion pasa también
+$	ext{SARIMA}(3, 0, 0)(0, 1, 1)_{12}$ por el *backtest* común, como
+experimento:
+
+| Modelo | AIC | RMSE | MAE | MAPE (%) |
+|---|---|---|---|---|
+| $(3, 0, 0)(1, 1, 1)_{12}$, elegido | 335,85 | 770,97 | 606,25 | 4,12 |
+| $(3, 0, 0)(0, 1, 1)_{12}$, contraste | 339,89 | 753,51 | 586,96 | 3,99 |
+
+El AIC prefiere $P = 1$ y el *backtest* prefiere $P = 0$, por 19 MW de MAE
+(un 3 %). No miden lo mismo: el AIC juzga el ajuste a toda la serie,
+castigado por el número de parámetros, y el *backtest* juzga los pronósticos
+de 1 a 12 meses desde 13 orígenes. Mantenemos el modelo elegido por AIC en
+la tabla de la sección 6 porque la regla de selección se fijó antes de mirar
+el *backtest*. Elegir ahora $P = 0$ por su error de prueba sería usar los
+datos de prueba para seleccionar el modelo, y su error dejaría de ser una
+medida honesta de cómo pronostica. El contraste sí dice algo útil: el
+término AR estacional ($\Phi_1 = 0{,}269$) mejora el ajuste pero no los
+pronósticos en estos dos años.
 
 {{La variable exógena: qué es, por qué se conoce de antemano y si mejora al
 SARIMA.}}

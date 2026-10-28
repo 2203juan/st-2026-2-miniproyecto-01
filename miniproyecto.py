@@ -214,19 +214,105 @@ def estacionariedad(serie):
 # Cada modelo es una función modelo(entrenamiento, h) que devuelve h
 # pronósticos y solo usa `entrenamiento`. Así entra al backtest común.
 
-def elegir_sarima(serie, d, D):
-    """TODO: rejilla pequeña de órdenes (p, q, P, Q) comparada por AIC.
+# Los modelos se ajustan sobre serie / ESCALA, en GW (valores entre 12,8 y
+# 19,2), y sus pronósticos se multiplican por ESCALA para volver a MW. Con
+# la serie en MW, sigma2 queda en cientos de miles y el optimizador se pierde.
+ESCALA = 1000
 
-    Ajuste con toda la serie preparada, imprima la tabla de AIC, revise los
-    residuos del elegido con Ljung-Box y guarde figuras/residuos.png.
-    Devuelva el orden y el orden estacional elegidos.
+# Rejilla: p de 0 a 3 y q de 0 a 2 (la PACF de diff(12) sale en los rezagos
+# 1 y 3), P y Q en 0 o 1 (el pico del rezago 12). d y D quedan fijos: cambian
+# la serie que se modela y el AIC de series distintas no se compara.
+REJILLA_P, REJILLA_Q, REJILLA_ESTACIONAL = range(4), range(3), range(2)
+
+
+def elegir_sarima(serie, d, D):
+    """Rejilla pequeña de órdenes (p, q, P, Q) comparada por AIC.
+
+    Ajusta con toda la serie preparada, imprime la tabla de AIC, revisa los
+    residuos del elegido con Ljung-Box y guarda figuras/residuos.png.
+    Devuelve el orden y el orden estacional elegidos.
     """
-    raise NotImplementedError("selección del SARIMA")
+    import itertools
+
+    from statsmodels.graphics.tsaplots import plot_acf
+    from statsmodels.stats.diagnostic import acorr_ljungbox
+    from statsmodels.tsa.arima.model import ARIMA
+
+    escalada = serie / ESCALA
+    filas = []
+    for p, q, P, Q in itertools.product(REJILLA_P, REJILLA_Q,
+                                        REJILLA_ESTACIONAL, REJILLA_ESTACIONAL):
+        ajuste = ARIMA(escalada, order=(p, d, q),
+                       seasonal_order=(P, D, Q, PERIODO)).fit()
+        filas.append({"order": (p, d, q), "seasonal_order": (P, D, Q, PERIODO),
+                      "AIC": ajuste.aic})
+    rejilla = pd.DataFrame(filas).sort_values("AIC").reset_index(drop=True)
+
+    print(f"\nParte 4. Rejilla SARIMA: {len(rejilla)} modelos con d = {d} y D = {D}, "
+          f"ordenados por AIC (los 10 primeros)")
+    print(rejilla.head(10).to_string(formatters={"AIC": "{:.2f}".format}))
+    orden = rejilla.loc[0, "order"]
+    orden_estacional = rejilla.loc[0, "seasonal_order"]
+    print(f"  elegido: SARIMA{orden}{orden_estacional}, AIC {rejilla.loc[0, 'AIC']:.2f}")
+
+    mejor = ARIMA(escalada, order=orden, seasonal_order=orden_estacional).fit()
+    print("  coeficientes del elegido (serie en GW):")
+    for nombre, valor in mejor.params.items():
+        print(f"    {nombre:<10} {valor:+.3f}  (valor p {mejor.pvalues[nombre]:.3f})")
+
+    # Los primeros d + 12·D residuos salen de la inicialización de las
+    # diferencias, no son errores de pronóstico: se dejan por fuera.
+    residuos = mejor.resid.iloc[d + PERIODO * D:] * ESCALA
+    prueba = acorr_ljungbox(residuos, lags=[12, 24])
+    print(f"  Ljung-Box sobre {len(residuos)} residuos (H0: son ruido blanco):")
+    for rezago, fila_lb in prueba.iterrows():
+        print(f"    lags={rezago}: Q = {fila_lb['lb_stat']:.2f}, "
+              f"valor p {fila_lb['lb_pvalue']:.3f}")
+    print(f"  residuos: media {residuos.mean():+,.0f} MW, "
+          f"desviación estándar {residuos.std():,.0f} MW")
+
+    figura, ejes = plt.subplots(2, 1, figsize=(9, 6))
+    ejes[0].plot(residuos.index, residuos.to_numpy())
+    ejes[0].axhline(0, color="gray", linewidth=0.8)
+    ejes[0].set_title(f"Residuos de SARIMA{orden}{orden_estacional}")
+    ejes[0].set_ylabel("MW")
+    plot_acf(residuos, lags=36, ax=ejes[1], title="ACF de los residuos")
+    figura.tight_layout()
+    figura.savefig(FIGURAS / "residuos.png", dpi=120)
+    plt.close(figura)
+    return orden, orden_estacional
 
 
 def modelo_sarima(orden, orden_estacional):
-    """TODO: devuelva la función modelo(entrenamiento, h) del SARIMA elegido."""
-    raise NotImplementedError("SARIMA en el backtest")
+    """Devuelve la función modelo(entrenamiento, h) del SARIMA elegido."""
+    from statsmodels.tsa.arima.model import ARIMA
+
+    def modelo(entrenamiento, h):
+        # Se reajusta en cada origen solo con `entrenamiento`: no hay fuga.
+        ajuste = ARIMA(entrenamiento / ESCALA, order=orden,
+                       seasonal_order=orden_estacional).fit()
+        return ajuste.forecast(h).to_numpy() * ESCALA
+
+    return modelo
+
+
+def contrastar_estacional(serie, orden, orden_estacional):
+    """Experimento: el mismo SARIMA con P cambiado (1 -> 0 o 0 -> 1).
+
+    La rejilla elige por AIC, que mide el ajuste dentro de la muestra. Este
+    contraste mide el modelo vecino en el mismo backtest. No entra a la tabla:
+    elegir el modelo por su backtest sería usar los datos de prueba para
+    seleccionarlo.
+    """
+    from statsmodels.tsa.arima.model import ARIMA
+
+    P, D, Q, s = orden_estacional
+    vecino = (1 - P, D, Q, s)
+    aic = ARIMA(serie / ESCALA, order=orden, seasonal_order=vecino).fit().aic
+    _, promedio = backtest(serie, modelo_sarima(orden, vecino))
+    print(f"  contraste (no entra a la tabla): SARIMA{orden}{vecino}, AIC {aic:.2f} | "
+          f"backtest RMSE {promedio['RMSE']:.2f}, MAE {promedio['MAE']:.2f}, "
+          f"MAPE {promedio['MAPE']:.2f}")
 
 
 def exogenas(serie):
@@ -289,6 +375,7 @@ def main():
             orden, estacional = elegir_sarima(serie, d, D)
             filas.append(fila(f"SARIMA{orden}{estacional}", serie,
                               modelo_sarima(orden, estacional)))
+            contrastar_estacional(serie, orden, estacional)
             x = exogenas(serie)
             filas.append(fila(f"SARIMAX{orden}{estacional} + exógenas", serie,
                               modelo_sarimax(orden, estacional, x)))
