@@ -302,7 +302,7 @@ atípico que conservamos en la sección 1.
 
 En la sección 4 propusimos $P = 0$ y la rejilla eligió $P = 1$. Para ver
 qué se gana con ese término, el guion pasa también
-$	ext{SARIMA}(3, 0, 0)(0, 1, 1)_{12}$ por el *backtest* común, como
+$\text{SARIMA}(3, 0, 0)(0, 1, 1)_{12}$ por el *backtest* común, como
 experimento:
 
 | Modelo | AIC | RMSE | MAE | MAPE (%) |
