@@ -1,10 +1,5 @@
 # Informe del miniproyecto 1
 
-Llene cada sección reemplazando los marcadores `{{...}}`, sin quitar las
-secciones. Las cifras salen de lo que imprime `python miniproyecto.py` y las
-figuras son las que ese guion deja en `figuras/`. Las fórmulas van en LaTeX
-(`$...$` o `$$...$$`).
-
 ## 1. La serie
 
 La serie es la carga eléctrica media por hora de cada mes en la zona de
@@ -356,15 +351,60 @@ tiene un MAE de 622,35 MW frente a 606,25 del SARIMA (sección 6).
 
 ## 6. Tabla de métricas
 
-{{Copie aquí `resultados/metricas.csv` como tabla de Markdown, ordenada por
-RMSE.}}
+Es `resultados/metricas.csv`, ordenada por RMSE. Las cuatro filas salen del
+mismo *backtest* de `comun.py`: 13 orígenes, de julio de 2016 a julio de
+2017, y horizonte de 1 a 12 meses. RMSE y MAE están en MW. La columna
+`decision` es la misma en las cuatro filas porque todos los modelos usan la
+serie preparada igual: *sin huecos (ago-2018 incompleto se descarta al
+agregar); el atípico de jul-2009 se conserva porque es demanda real*.
 
 | Modelo | Decisión | RMSE | MAE | MAPE (%) |
 |---|---|---|---|---|
-| {{...}} | {{...}} | {{...}} | {{...}} | {{...}} |
+| SARIMA(3, 0, 0)(1, 1, 1, 12) | ver arriba | 770,97 | 606,25 | 4,12 |
+| SARIMAX(3, 0, 0)(1, 1, 1, 12) + exógenas | ver arriba | 787,37 | 622,35 | 4,23 |
+| Estacional ingenuo | ver arriba | 935,52 | 763,24 | 5,09 |
+| Ingenuo | ver arriba | 1 641,37 | 1 385,72 | 9,52 |
+
+El SARIMA gana en las tres métricas, y el SARIMAX lo sigue a 16 MW de
+RMSE: los festivos no le aportan información que la
+parte estacional no tenga (sección 5). Las dos líneas base quedan al final,
+en el mismo orden que en la sección 3. El contraste con $P = 0$ de la sección
+5 no entra a la tabla, porque la tabla solo lleva el modelo que eligió la
+regla del AIC. El contraste fue una prueba para ver qué pasaba sin el AR
+estacional.
 
 ## 7. Conclusión
 
-{{El mejor modelo clásico, cuánto mejora a la mejor línea base en cada
-métrica y en qué meses o tramos sigue fallando. Es el modelo que el
-miniproyecto 2 debe superar.}}
+El mejor modelo clásico es $\text{SARIMA}(3, 0, 0)(1, 1, 1)_{12}$. Frente a
+la mejor línea base, el estacional ingenuo, reduce el error en las tres
+métricas:
+
+| Métrica | Estacional ingenuo | SARIMA | Reducción |
+|---|---|---|---|
+| RMSE (MW) | 935,52 | 770,97 | 18 % |
+| MAE (MW) | 763,24 | 606,25 | 21 % |
+| MAPE (%) | 5,09 | 4,12 | 19 % |
+
+La mejora no es pareja en todo el *backtest*. El guion imprime el MAE por
+origen: el SARIMA gana en 8 de los 13 orígenes. Gana en noviembre de 2016
+(683 MW frente a 817) y en todos los de enero a julio de 2017, donde su MAE
+baja a 386–438 MW frente a 702–840 MW del estacional ingenuo. Pierde en los orígenes de julio a octubre
+de 2016 y en el de diciembre de 2016. El peor es septiembre de 2016, con
+1 054 MW frente a 761. Desde esos orígenes el SARIMA pronostica por encima
+de lo real, en promedio unos 1 000 MW desde agosto y septiembre de 2016:
+agosto de 2016 quedó unos 1 500 MW por encima de agosto de 2015, y los términos
+AR arrastran ese exceso a los meses siguientes, cuando la carga ya había
+vuelto a su nivel. El estacional ingenuo copia el año anterior y no sufre
+ese arrastre.
+
+El contraste de la sección 5 lo confirma: el mismo modelo
+sin el término AR estacional ($P = 0$) pronostica un poco mejor (MAE de
+586,96 MW), aunque su AIC es peor. Los términos autorregresivos mejoran el
+ajuste de la serie completa, pero en el *backtest* trasladan a los meses
+siguientes desvíos recientes como el de agosto de 2016.
+
+Este SARIMA, con RMSE de 770,97 MW, MAE de 606,25 MW y MAPE de 4,12 %, es el
+modelo que el miniproyecto 2 debe superar. Conviene compararlo también con
+el contraste de $P = 0$, que tiene el menor MAE del *backtest*. Los festivos
+no lo mejoraron; una variable con más relación con la carga, como la temperatura, podría
+ayudar, pero no se conoce de antemano: habría que pronosticarla también.
