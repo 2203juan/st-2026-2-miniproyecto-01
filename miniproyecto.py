@@ -397,9 +397,9 @@ def main():
     serie = preparar(cruda)
     graficar_serie(serie)
 
-    filas = [fila("ingenuo", serie, ingenuo),
-             fila("estacional ingenuo", serie,
-                  lambda t, h: estacional_ingenuo(t, h, PERIODO))]
+    modelos = {"ingenuo": ingenuo,
+               "estacional ingenuo": lambda t, h: estacional_ingenuo(t, h, PERIODO)}
+    filas = [fila(nombre, serie, modelo) for nombre, modelo in modelos.items()]
 
     try:
         descomponer(serie)
@@ -415,20 +415,50 @@ def main():
     if d is not None:
         try:
             orden, estacional = elegir_sarima(serie, d, D)
-            filas.append(fila(f"SARIMA{orden}{estacional}", serie,
-                              modelo_sarima(orden, estacional)))
+            nombre = f"SARIMA{orden}{estacional}"
+            modelos[nombre] = modelo_sarima(orden, estacional)
+            filas.append(fila(nombre, serie, modelos[nombre]))
             contrastar_estacional(serie, orden, estacional)
             x = exogenas(serie)
             resumen_sarimax(serie, orden, estacional, x)
-            filas.append(fila(f"SARIMAX{orden}{estacional} + exógenas", serie,
-                              modelo_sarimax(orden, estacional, x)))
+            nombre = f"SARIMAX{orden}{estacional} + exógenas"
+            modelos[nombre] = modelo_sarimax(orden, estacional, x)
+            filas.append(fila(nombre, serie, modelos[nombre]))
         except NotImplementedError as error:
             pendiente("parte 4", error)
 
     tabla = pd.DataFrame(filas).sort_values("RMSE")
     tabla.to_csv(RESULTADOS / "metricas.csv", index=False)
+    print("\nParte 5. Tabla de métricas (backtest común)")
     print(tabla.drop(columns="decision").to_string(index=False))
     print("Mejor modelo por RMSE:", tabla.iloc[0]["modelo"])
+    comparar(serie, tabla, modelos)
+
+
+def comparar(serie, tabla, modelos):
+    """Mejor modelo frente a la mejor línea base, en cada métrica y por origen."""
+    metricas = ["RMSE", "MAE", "MAPE"]
+    lineas_base = tabla[tabla["modelo"].isin(["ingenuo", "estacional ingenuo"])]
+    base = lineas_base.iloc[0]   # la tabla ya viene ordenada por RMSE
+    mejor = tabla.iloc[0]
+    print(f"\n  mejor modelo: {mejor['modelo']} | mejor línea base: {base['modelo']}")
+    for m in metricas:
+        cambio = 1 - mejor[m] / base[m]
+        print(f"    {m}: {mejor[m]:,.2f} frente a {base[m]:,.2f} "
+              f"({cambio:.0%} menos de error)")
+    if mejor["modelo"] == base["modelo"]:
+        return
+
+    # MAE por origen: en qué tramos del backtest gana y en cuáles sigue fallando.
+    por_origen = {nombre: backtest(serie, modelos[nombre])[0].set_index("origen")["MAE"]
+                  for nombre in (base["modelo"], mejor["modelo"])}
+    comparacion = pd.DataFrame(por_origen)
+    print("  MAE por origen (MW):")
+    for origen, fila_o in comparacion.iterrows():
+        gana = mejor["modelo"] if fila_o[mejor["modelo"]] < fila_o[base["modelo"]] \
+            else base["modelo"]
+        print(f"    {origen:%Y-%m}: {base['modelo']} {fila_o[base['modelo']]:,.0f} | "
+              f"{mejor['modelo']} {fila_o[mejor['modelo']]:,.0f} -> gana {gana}")
 
 
 if __name__ == "__main__":
